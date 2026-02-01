@@ -21,6 +21,64 @@ Account1                                  Account2
 ローカル PC ──✕──► Private API Gateway  (アクセス不可)
 ```
 
+## アカウント間で共有が必要な情報
+
+チーム間でこの構成を構築する場合、以下の情報をやり取りする必要がある。
+
+### 事前合意
+
+| 情報 | 例 | 備考 |
+|------|-----|------|
+| リージョン | `ap-northeast-1` | 双方で使用するリージョンを決めておく |
+
+> **なぜ同じリージョンが必要か**:
+> VPC Endpoint はリージョン単位のサービスで、例えば `com.amazonaws.ap-northeast-1.execute-api` を作ると
+> ap-northeast-1 の API Gateway にしか接続できない。
+> Private DNS が有効な場合、`*.execute-api.ap-northeast-1.amazonaws.com` の DNS クエリが
+> VPC Endpoint の ENI のプライベート IP に解決されるが、この ENI は同リージョンの execute-api サービスにしかつながっていない。
+> リージョンが異なると `Could not resolve host` エラーになる。
+
+### デプロイ時に必要な情報
+
+Account1 の VPC Endpoint (`com.amazonaws.{region}.execute-api`) は AWS のパブリックサービスエンドポイントに接続するため、
+**Account1 のデプロイ時に Account2 の情報は一切不要**。
+Account2 のデプロイ時に初めて Account1 の VPC Endpoint ID が必要になる。
+
+| タイミング | 方向 | 情報 | 例 | 用途 |
+|-----------|------|------|-----|------|
+| Account1 デプロイ時 | なし | なし | — | 相手の情報は不要 |
+| Account2 デプロイ時 | Account1 → Account2 | VPC Endpoint ID | `vpce-0bfc2e6343d79782a` | API Gateway の Resource Policy で `aws:sourceVpce` 条件に設定 |
+
+### 動作確認時に必要な情報
+
+Account2 のデプロイ後、Account1 の EC2 から API を呼び出すために以下が必要。
+
+| 方向 | 情報 | 例 | 用途 |
+|------|------|-----|------|
+| Account2 → Account1 | API Gateway ID | `mkrl6t6ti8` | Invoke URL の構築に使用 |
+| Account2 → Account1 | Invoke URL | `https://mkrl6t6ti8.execute-api.ap-northeast-1.amazonaws.com/prod/` | EC2 から API を呼び出すエンドポイント |
+
+### 連携フロー
+
+```
+Account1 チーム                          Account2 チーム
+      │                                        │
+      │◄──────── リージョンを合意 ────────────►│
+      │                                        │
+      │  1. VPC + VPC Endpoint をデプロイ        │
+      │     (相手の情報は不要)                    │
+      │                                        │
+      │── VPC Endpoint ID ─────────────────────►│
+      │                                        │
+      │                 2. API Gateway + Lambda をデプロイ
+      │                    (VPCE ID を Resource Policy に設定)
+      │                                        │
+      │◄── API Gateway ID, Invoke URL ─────────│
+      │                                        │
+      │  3. EC2 から curl で動作確認              │
+      │                                        │
+```
+
 ## 前提条件
 
 - AWS CLI がインストール済み
