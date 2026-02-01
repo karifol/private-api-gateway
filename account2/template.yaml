@@ -4,8 +4,8 @@ Description: "Account2 - Private API Gateway + Lambda"
 Parameters:
   Account1VpceId:
     Type: String
-    Default: "*"
-    Description: "Account1 VPC Endpoint ID (vpce-xxx). Use * for initial deployment."
+    Description: "Account1 VPC Endpoint ID (vpce-xxx)"
+    AllowedPattern: 'vpce-[a-z0-9]+'
 
 Resources:
   # Lambda
@@ -47,8 +47,6 @@ Resources:
       EndpointConfiguration:
         Types:
           - PRIVATE
-        VpcEndpointIds:
-          - !Ref Account1VpceId
       Policy:
         Version: "2012-10-17"
         Statement:
